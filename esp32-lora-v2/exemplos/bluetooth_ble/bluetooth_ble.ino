@@ -10,6 +10,7 @@
 
 BLECharacteristic *pCharacteristic;
 bool deviceConnected = false;
+bool reiniciarBle = false;
 
 #define SERVICE_UUID           "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID_TX "6d68efe5-04b6-4a85-abc4-c2670b7bf7fd"
@@ -28,8 +29,37 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
   void onDisconnect(BLEServer* pServer) {
     deviceConnected = false;
+    reiniciarBle = true;
   }
 };
+
+void StartBluetoothBle(){
+  /* Criar o BLE Device */
+  BLEDevice::init("ESP32");
+
+  /* Criar o BLE Server */
+  BLEServer *pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  /* Criar o BLE Service */
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+
+  /* Criar o BLE Characteristic */
+  pCharacteristic =pService->createCharacteristic(CHARACTERISTIC_UUID_TX, BLECharacteristic::PROPERTY_NOTIFY);
+
+  /* BLE2902 precisa notificar */
+  pCharacteristic->addDescriptor(new BLE2902());
+
+  /* Iniciar o serviço */
+  pService->start();
+
+  /* Começar a anunciar */
+  pServer->getAdvertising()->start();
+
+  reiniciarBle = false;
+  Serial.println("BLE iniciado");
+}
+
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RST); /* Definicões do Display OLED */
 
@@ -57,30 +87,10 @@ void setup() {
     display.setCursor(0, 0);
     display.print("Esperando conexao");
     display.display();
-    delay(2000);
-  }  
+    //delay(2000);
+  }
 
-  /* Criar o BLE Device */
-  BLEDevice::init("ESP32");
-
-  /* Criar o BLE Server */
-  BLEServer *pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
-
-  /* Criar o BLE Service */
-  BLEService *pService = pServer->createService(SERVICE_UUID);
-
-  /* Criar o BLE Characteristic */
-  pCharacteristic =pService->createCharacteristic(CHARACTERISTIC_UUID_TX, BLECharacteristic::PROPERTY_NOTIFY);
-
-  /* BLE2902 precisa notificar */
-  pCharacteristic->addDescriptor(new BLE2902());
-
-  /* Iniciar o serviço */
-  pService->start();
-
-  /* Começar a anunciar */
-  pServer->getAdvertising()->start();
+  StartBluetoothBle();
 
   Serial.println("Esperando por uma conexão do cliente para notificar");
 }
@@ -108,5 +118,9 @@ void loop() {
 
     cont++;
     delay(1000);
+  } else {
+    if(reiniciarBle){
+      StartBluetoothBle();
+    }
   }
 }
